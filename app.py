@@ -10,6 +10,10 @@ app = Flask(__name__)
 app.secret_key = os.eviron.get("SECRET_KEY", "yokohama-dev-key-default-12345") 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
+instance_path = os.path.join(basedir, 'instance')
+
+if not os.path.exists(instance_path):
+    os.makedirs(instance_path)
 # 2. データベースの設定（tasks.db というファイルに保存されます）
 db_path = os.path.join(basedir, 'instance', 'tasks.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
