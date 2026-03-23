@@ -7,6 +7,21 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
+# Renderの「Environment」に設定した DATABASE_URL を読み込む
+db_url = os.environ.get('DATABASE_URL')
+
+if db_url:
+    # もし Render 上なら、Supabase の URL を使う
+    # 先頭が postgres:// だと動かないことがあるので、postgresql:// に変換
+    if db_url.startswith("postgres://"):
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_url.replace("postgres://", "postgresql://", 1)
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+else:
+    # 自分のPCなら、いつもの SQLite を使う
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'tasks.db')
+
 app.secret_key = os.environ.get("SECRET_KEY", "yokohama-dev-key-default-12345") 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
