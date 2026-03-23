@@ -137,6 +137,14 @@ def index():
                 )
                 db.session.add(new_comment)
 
+        elif action == "delete_comment":
+            comment_id = request.form.get("comment_id", type=int)
+            comment = Comment.query.get(comment_id)
+            
+            # コメントが存在し、かつ「書いた本人」である場合のみ削除を許可
+            if comment and comment.user_id == session["user_id"]:
+                db.session.delete(comment)
+
         elif action == "clear_done":
             Task.query.filter_by(done=True).delete()
 
