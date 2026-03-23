@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <title>Community Tasks</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root { --main-orange: #e67e22; --bg-cream: #fffaf0; --alert-red: #e74c3c; --user-blue: #3498db; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: var(--bg-cream); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; width: 100%; max-width: 500px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h1 { margin: 0; color: var(--main-orange); font-size: 28px; }
+        .header-info { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; }
+        
+        .input-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px; background: #fdf2e9; padding: 15px; border-radius: 12px; border: 2px solid transparent; }
+        .edit-mode { border-color: var(--main-orange); } 
+        
+        input[type="text"], input[type="date"] { padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        .user-input { border-left: 4px solid var(--user-blue) !important; font-weight: bold; color: var(--user-blue); }
+        
+        .btn-add { background: var(--main-orange); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-cancel { background: #eee; color: #666; text-decoration: none; text-align: center; padding: 10px; border-radius: 8px; font-size: 13px; }
+
+        .task-card { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .overdue { border-left: 5px solid var(--alert-red); background: #fff5f5; }
+        .is-done { opacity: 0.6; background: #f9f9f9; }
+        .task-info { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+        .task-text { font-size: 16px; font-weight: bold; }
+        .user-badge { font-size: 11px; color: var(--user-blue); background: #ebf5fb; padding: 2px 8px; border-radius: 10px; width: fit-content; }
+        .done-text { text-decoration: line-through; color: #bdc3c7; }
+        
+        .btn-group { display: flex; gap: 5px; }
+        button, .btn-edit { border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 12px; text-decoration: none; }
+        .btn-toggle { background: #fef5e7; color: var(--main-orange); }
+        .btn-edit { background: #e8f4fd; color: #3498db; }
+        .btn-delete { background: #fff0f0; color: var(--alert-red); }
+        
+        .footer-actions { margin-top: 20px; text-align: center; }
+        .btn-clear { background: none; color: #95a5a6; text-decoration: underline; font-size: 13px; cursor: pointer; border: none; }
+        .btn-like {
+    background: #fff0f5; /* 優しいピンク色 */
+    color: #e91e63;
+    border: 1px solid #f8bbd0;
+    font-weight: bold;
+    transition: transform 0.1s;
+}
+
+.btn-like:active {
+    transform: scale(1.2); /* 押した瞬間にちょっと膨らむ！ */
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-info">
+            <h1>COMMUNITY</h1>
+            <p style="margin: 5px 0 0; font-size: 14px; color: #666;">
+            こんにちは、<strong>{{ user_name }}</strong> さん
+            <a href="/logout" style="margin-left: 10px; color: #e74c3c; text-decoration: none; font-size: 12px;">[ログアウト]</a>
+            </p>
+            <div style="font-size: 14px; color: #7f8c8d;">{{ todo_count }} / {{ total_count }} tasks</div>
+        </div>
+
+        <div style="margin-bottom: 20px; display: flex; gap: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+            <a href="/" style="text-decoration: none; color: {{ '#e67e22' if filter_user is none else '#999' }}; font-weight: bold;">
+                🌍 全員のタイムライン
+            </a>
+
+            <a href="/?user_id={{ session['user_id'] }}" 
+                style="text-decoration: none; color: {{ '#3498db' if (filter_user and filter_user.id == session['user_id']) else '#999' }}; font-weight: bold;">
+                    👤 自分のタスク
+            </a>
+        </div>
+
+        <form method="POST" class="input-group {{ 'edit-mode' if edit_task else '' }}">
+            <input type="hidden" name="task_id" value="{{ edit_task.id if edit_task else '' }}">
+
+            <input type="text" name="task_name" 
+                   value="{{ edit_task.name if edit_task else '' }}" 
+                   placeholder="何をする？" required>
+            
+            <input type="date" name="task_date" 
+                   value="{{ edit_task.date if (edit_task and edit_task.date) else today }}">
+            
+            {% if edit_task %}
+                <button type="submit" name="action" value="update" class="btn-add">変更を保存</button>
+                <a href="/" class="btn-cancel">キャンセル</a>
+            {% else %}
+                <button type="submit" name="action" value="add" class="btn-add">みんなに共有！</button>
+            {% endif %}
+        </form>
+
+    <div class="task-list">
+        {% for t in tasks %}
+            {% set is_overdue = (not t.done and t.date and t.date < today) %}
+            <div class="task-card {{ 'overdue' if is_overdue else '' }} {{ 'is-done' if t.done else '' }}" style="flex-direction: column; align-items: stretch;">
+            
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div class="task-info">
+                        <div class="user-badge">👤 {{ t.author.username }} <span style="font-weight:normal; opacity:0.7;">{{ t.created_at }}</span></div>
+                        <span class="task-text {{ 'done-text' if t.done else '' }}">{{ t.name }}</span>
+                        <span style="font-size: 12px; color: #999;">📅 期限: {{ t.date or '未設定' }}</span>
+                    </div>
+
+                    <form method="POST" class="btn-group">
+                        <input type="hidden" name="task_id" value="{{ t.id }}">
+                        <button type="submit" name="action" value="like" class="btn-like">
+                            {{ '❤️' if user_name in t.likes else '🤍' }} {{ t.likes|length }}
+                        </button>
+
+                        {% if t.author.username == user_name %}
+                            <a href="/?edit={{ t.id }}" class="btn-edit">編集</a>
+                            <button type="submit" name="action" value="toggle" class="btn-toggle">{{ '戻す' if t.done else '完了' }}</button>
+                            <button type="submit" name="action" value="delete" class="btn-delete">削除</button>
+                        {% endif %}
+                    </form>
+                </div>
+
+                <div class="comment-section" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee;">
+                    {% for c in t.comments %}
+                        <div style="font-size: 12px; margin-bottom: 5px; color: #555;">
+                            <strong style="color: var(--user-blue);">{{ c.user.username }}</strong>: 
+                            {{ c.content }} 
+                            <span style="font-size: 10px; opacity: 0.5;">({{ c.created_at }})</span>
+                        </div>
+                    {% endfor %}
+
+                    <form method="POST" style="display: flex; gap: 5px; margin-top: 10px;">
+                        <input type="hidden" name="task_id" value="{{ t.id }}">
+                        <input type="text" name="content" placeholder="応援メッセージを送る..." 
+                            style="flex: 1; font-size: 12px; padding: 6px; border-radius: 20px; border: 1px solid #ddd;" required>
+                        <button type="submit" name="action" value="comment" 
+                            style="background: var(--user-blue); color: white; border: none; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold;">送信</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    </div>    
+        {% if total_count > todo_count %}
+        <div class="footer-actions">
+            <form method="POST"><button type="submit" name="action" value="clear_done" class="btn-clear">完了済みを一掃する</button></form>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
