@@ -39,11 +39,6 @@ class Follow(db.Model):
     follower_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # フォローした人
     followed_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # フォローされた人
 
-# 3. 既存の Task モデルに「どのグループの投稿か」を記録する列を追加
-class Task(db.Model):
-    # ...（既存の列はそのまま）...
-    group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=True) # どのグループ用か（空でもOK） 
-
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False) # コメント本文
