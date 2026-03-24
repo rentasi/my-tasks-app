@@ -75,6 +75,21 @@
        .tab-link:hover:not(.active) {
     background-color: #e9ecef;
 } 
+
+        .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    background: white;
+    border: 2px dashed #eee;
+    border-radius: 15px;
+    color: #888;
+    margin-top: 20px;
+}
+
+        .empty-icon {
+    font-size: 40px;
+    margin-bottom: 10px;
+}
     </style>
 </head>
 <body>
@@ -101,9 +116,6 @@
                 👥 グループ
             </a>
 
-            <a href="/?tab=mine" class="tab-link {{ 'active' if current_tab == 'mine' }}">
-                👤 じぶん {% if todo_count > 0 %}<span class="badge bg-danger">{{ todo_count }}</span>{% endif %}
-            </a>
         </div>
 
         <form method="POST" class="input-group {{ 'edit-mode' if edit_task else '' }}">
@@ -125,64 +137,84 @@
         </form>
 
     <div class="task-list">
-        {% for t in tasks %}
-            {% set is_overdue = (not t.done and t.date and t.date < today) %}
-            <div class="task-card {{ 'overdue' if is_overdue else '' }} {{ 'is-done' if t.done else '' }}" style="flex-direction: column; align-items: stretch;">
-            
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div class="task-info">
-                        <div class="user-badge">👤 {{ t.author.username }} <span style="font-weight:normal; opacity:0.7;">{{ t.created_at }}</span></div>
-                        <span class="task-text {{ 'done-text' if t.done else '' }}">{{ t.name }}</span>
-                        <span style="font-size: 12px; color: #999;">📅 期限: {{ t.date or '未設定' }}</span>
+        {% if tasks %}
+            {% for t in tasks %}
+                {% set is_overdue = (not t.done and t.date and t.date < today) %}
+                <div class="task-card {{ 'overdue' if is_overdue else '' }} {{ 'is-done' if t.done else '' }}" style="flex-direction: column; align-items: stretch;">
+                
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div class="task-info">
+                            <div class="user-badge">👤 {{ t.author.username }} <span style="font-weight:normal; opacity:0.7;">{{ t.created_at }}</span></div>
+                            <span class="task-text {{ 'done-text' if t.done else '' }}">{{ t.name }}</span>
+                            <span style="font-size: 12px; color: #999;">📅 期限: {{ t.date or '未設定' }}</span>
+                        </div>
+
+                        <form method="POST" class="btn-group">
+                            <input type="hidden" name="task_id" value="{{ t.id }}">
+                            <button type="submit" name="action" value="like" class="btn-like">
+                                {{ '❤️' if user_name in t.likes else '🤍' }} {{ t.likes|length }}
+                            </button>
+
+                            {% if t.author.username == user_name %}
+                                <a href="/?edit={{ t.id }}" class="btn-edit">編集</a>
+                                <button type="submit" name="action" value="toggle" class="btn-toggle">{{ '戻す' if t.done else '完了' }}</button>
+                                <button type="submit" name="action" value="delete" class="btn-delete">削除</button>
+                            {% endif %}
+                        </form>
                     </div>
 
-                    <form method="POST" class="btn-group">
-                        <input type="hidden" name="task_id" value="{{ t.id }}">
-                        <button type="submit" name="action" value="like" class="btn-like">
-                            {{ '❤️' if user_name in t.likes else '🤍' }} {{ t.likes|length }}
-                        </button>
+                    <div class="comment-section" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee;">
+                        {% for c in t.comments %}
+                            <div style="font-size: 12px; margin-bottom: 5px; color: #555;">
+                                <div>
+                                    <strong style="color: var(--user-blue);">{{ c.user.username }}</strong>: 
+                                    {{ c.content }} 
+                                    <span style="font-size: 10px; opacity: 0.5;">({{ c.created_at }})</span>
+                                </div>
 
-                        {% if t.author.username == user_name %}
-                            <a href="/?edit={{ t.id }}" class="btn-edit">編集</a>
-                            <button type="submit" name="action" value="toggle" class="btn-toggle">{{ '戻す' if t.done else '完了' }}</button>
-                            <button type="submit" name="action" value="delete" class="btn-delete">削除</button>
-                        {% endif %}
-                    </form>
-                </div>
 
-                <div class="comment-section" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee;">
-                    {% for c in t.comments %}
-                        <div style="font-size: 12px; margin-bottom: 5px; color: #555;">
-                            <div>
-                                <strong style="color: var(--user-blue);">{{ c.user.username }}</strong>: 
-                                {{ c.content }} 
-                                <span style="font-size: 10px; opacity: 0.5;">({{ c.created_at }})</span>
+                                {% if c.user_id == session["user_id"] %}
+                                <form method="POST" style="margin: 0;">
+                                    <input type="hidden" name="action" value="delete_comment">
+                                    <input type="hidden" name="comment_id" value="{{ c.id }}">
+                                    <button type="submit" style="background: none; border: none; color: #ff4d4d; cursor: pointer; font-size: 10px; padding: 0 5px;">
+                                        ✕
+                                    </button>
+                                </form>
+                                {% endif %}
                             </div>
+                            {% endfor %}
 
-
-                            {% if c.user_id == session["user_id"] %}
-                            <form method="POST" style="margin: 0;">
-                                <input type="hidden" name="action" value="delete_comment">
-                                <input type="hidden" name="comment_id" value="{{ c.id }}">
-                                <button type="submit" style="background: none; border: none; color: #ff4d4d; cursor: pointer; font-size: 10px; padding: 0 5px;">
-                                    ✕
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-
-                    <form method="POST" style="display: flex; gap: 5px; margin-top: 10px;">
-                        <input type="hidden" name="task_id" value="{{ t.id }}">
-                        <input type="text" name="content" placeholder="応援メッセージを送る..." 
-                            style="flex: 1; font-size: 12px; padding: 6px; border-radius: 20px; border: 1px solid #ddd;" required>
-                        <button type="submit" name="action" value="comment" 
-                            style="background: var(--user-blue); color: white; border: none; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold;">送信</button>
-                    </form>
+                        <form method="POST" style="display: flex; gap: 5px; margin-top: 10px;">
+                            <input type="hidden" name="task_id" value="{{ t.id }}">
+                            <input type="text" name="content" placeholder="応援メッセージを送る..." 
+                                style="flex: 1; font-size: 12px; padding: 6px; border-radius: 20px; border: 1px solid #ddd;" required>
+                            <button type="submit" name="action" value="comment" 
+                                style="background: var(--user-blue); color: white; border: none; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: bold;">送信</button>
+                        </form>
+                    </div>
                 </div>
+            {% endfor %}
+        
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    {% if current_tab == 'group' %}👥{% elif current_tab == 'mine' %}👤{% else %}🕒{% endif %}
+                </div>
+                <p>
+                    {% if current_tab == 'group' %}
+                        まだグループに投稿はありません
+                    {% elif current_tab == 'mine' %}
+                        登録されているタスクはありません
+                    {% else %}
+                        表示できる投稿がありません
+                    {% endif %}
+                </p>
+                <p style="font-size: 12px; color: #bbb;">最初のタスクを共有してみましょう！</p>
             </div>
-        {% endfor %}
+        {% endif %} 
     </div>    
+    
         {% if total_count > todo_count %}
         <div class="footer-actions">
             <form method="POST"><button type="submit" name="action" value="clear_done" class="btn-clear">完了済みを一掃する</button></form>
