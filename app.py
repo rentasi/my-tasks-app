@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
-app.secret_key = os.eviron.get("SECRET_KEY", "yokohama-dev-key-default-12345") 
+app.secret_key = os.environ.get("SECRET_KEY", "yokohama-dev-key-default-12345") 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 instance_path = os.path.join(basedir, 'instance')
