@@ -28,16 +28,16 @@ class User(db.Model):
     # そのユーザーが持っているタスクを紐付ける
     tasks = db.relationship('Task', backref='author', lazy=True)
 
-class Follow(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    follower_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # フォローした人
-    followed_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # フォローされた人
-
 # 2. グループ（コミュニティ）を管理するテーブル
 class Group(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False) # グループ名（例：起業部）
     description = db.Column(db.String(200)) # 説明文
+
+class Follow(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    follower_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # フォローした人
+    followed_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # フォローされた人
 
 # 3. 既存の Task モデルに「どのグループの投稿か」を記録する列を追加
 class Task(db.Model):
