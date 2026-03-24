@@ -123,7 +123,6 @@ def index():
         elif action == "clear_done":
             Task.query.filter_by(done=True).delete()
 
-        db.session.commit() # 5. 最後にまとめて変更を確定（保存）！
         return redirect("/")
     
     my_id = session["user_id"]
@@ -170,6 +169,8 @@ def index():
     # 編集中のタスクIDを取得
     edit_id = request.args.get("edit", type=int)
     edit_task = Task.query.get(edit_id) if edit_id else None
+    
+    db.session.commit() # 5. 最後にまとめて変更を確定（保存）！
 
     return render_template("index.html", 
                            tasks=tasks, 
