@@ -7,24 +7,16 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
-# Renderの「Environment」に設定した DATABASE_URL を読み込む
-db_url = os.environ.get('DATABASE_URL')
+app.secret_key = os.eviron.get("SECRET_KEY", "yokohama-dev-key-default-12345") 
 
-if db_url:
-    # もし Render 上なら、Supabase の URL を使う
-    # 先頭が postgres:// だと動かないことがあるので、postgresql:// に変換
-    if db_url.startswith("postgres://"):
-        app.config['SQLALCHEMY_DATABASE_URI'] = db_url.replace("postgres://", "postgresql://", 1)
-    else:
-        app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-else:
-    # 自分のPCなら、いつもの SQLite を使う
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'tasks.db')
+basedir = os.path.abspath(os.path.dirname(__file__))
+instance_path = os.path.join(basedir, 'instance')
 
-app.secret_key = os.environ.get("SECRET_KEY", "yokohama-dev-key-default-12345") 
-
+if not os.path.exists(instance_path):
+    os.makedirs(instance_path)
 # 2. データベースの設定（tasks.db というファイルに保存されます）
+db_path = os.path.join(basedir, 'instance', 'tasks.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -35,6 +27,22 @@ class User(db.Model):
     password_hash = db.Column(db.String(200), nullable=False)        # 暗号化されたパスワード
     # そのユーザーが持っているタスクを紐付ける
     tasks = db.relationship('Task', backref='author', lazy=True)
+
+class Follow(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    follower_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # フォローした人
+    followed_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # フォローされた人
+
+# 2. グループ（コミュニティ）を管理するテーブル
+class Group(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False) # グループ名（例：起業部）
+    description = db.Column(db.String(200)) # 説明文
+
+# 3. 既存の Task モデルに「どのグループの投稿か」を記録する列を追加
+class Task(db.Model):
+    # ...（既存の列はそのまま）...
+    group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=True) # どのグループ用か（空でもOK） 
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -73,26 +81,6 @@ with app.app_context():
 def index():
     if "user_name" not in session:
         return redirect("/login")
-
-    # 1. URLから「誰のタスクを表示するか」のIDを取得
-    filter_user_id = request.args.get('user_id', type=int)
-    filter_user = None
-
-    # 2. データの取得開始
-    if filter_user_id:
-        # 3. 絞り込み中のユーザー名を取得（画面表示用）
-        filter_user = User.query.get(filter_user_id)
-        # 特定のユーザーで絞り込み ＋ IDの大きい順（新着順）
-        tasks = Task.query.filter_by(user_id=filter_user_id).order_by(Task.id.desc()).all()
-    else:
-        # 全員のタスク ＋ IDの大きい順（新着順）
-        tasks = Task.query.order_by(Task.id.desc()).all()
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    
-    # 編集中のタスクIDを取得
-    edit_id = request.args.get("edit", type=int)
-    edit_task = Task.query.get(edit_id) if edit_id else None
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -137,19 +125,58 @@ def index():
                 )
                 db.session.add(new_comment)
 
-        elif action == "delete_comment":
-            comment_id = request.form.get("comment_id", type=int)
-            comment = Comment.query.get(comment_id)
-            
-            # コメントが存在し、かつ「書いた本人」である場合のみ削除を許可
-            if comment and comment.user_id == session["user_id"]:
-                db.session.delete(comment)
-
         elif action == "clear_done":
             Task.query.filter_by(done=True).delete()
 
         db.session.commit() # 5. 最後にまとめて変更を確定（保存）！
         return redirect("/")
+    
+    my_id = session["user_id"]
+
+    # URLから「どのタブを表示するか」を取得（デフォルトは 'timeline'）
+    current_tab = request.args.get('tab', 'timeline')
+
+    if current_tab == 'mine':
+        # ① 自分だけ
+        tasks = Task.query.filter_by(user_id=my_id).order_by(Task.id.desc()).all()
+
+    elif current_tab == 'group':
+        # ② グループ（自分が所属しているグループのタスク）
+        # ※ 今は簡単のため「group_id が設定されているもの全部」にします
+        tasks = Task.query.filter(Task.group_id != None).order_by(Task.id.desc()).all()
+
+    else: # 'timeline'（自分 ＋ フォローしている人）
+        # 1. 自分がフォローしている人のIDリストを取得
+        following_list = Follow.query.filter_by(follower_id=my_id).all()
+        following_ids = [f.followed_id for f in following_list]
+        
+        # 2. 「自分のID」と「フォロー中のID」を合体させる
+        target_ids = following_ids + [my_id]
+        
+        # 3. そのリストに含まれる人のタスクだけを取得（これがBeReal風！）
+        tasks = Task.query.filter(Task.user_id.in_(target_ids)).order_by(Task.id.desc()).all()
+
+    return render_template("index.html", tasks=tasks, current_tab=current_tab)
+
+    # 1. URLから「誰のタスクを表示するか」のIDを取得
+    filter_user_id = request.args.get('user_id', type=int)
+    filter_user = None
+
+    # 2. データの取得開始
+    if filter_user_id:
+        # 3. 絞り込み中のユーザー名を取得（画面表示用）
+        filter_user = User.query.get(filter_user_id)
+        # 特定のユーザーで絞り込み ＋ IDの大きい順（新着順）
+        tasks = Task.query.filter_by(user_id=filter_user_id).order_by(Task.id.desc()).all()
+    else:
+        # 全員のタスク ＋ IDの大きい順（新着順）
+        tasks = Task.query.order_by(Task.id.desc()).all()
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # 編集中のタスクIDを取得
+    edit_id = request.args.get("edit", type=int)
+    edit_task = Task.query.get(edit_id) if edit_id else None
 
     return render_template("index.html", 
                            tasks=tasks, 
