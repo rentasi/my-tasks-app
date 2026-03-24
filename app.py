@@ -151,8 +151,6 @@ def index():
         # 3. そのリストに含まれる人のタスクだけを取得（これがBeReal風！）
         tasks = Task.query.filter(Task.user_id.in_(target_ids)).order_by(Task.id.desc()).all()
 
-    return render_template("index.html", tasks=tasks, current_tab=current_tab)
-
     # 1. URLから「誰のタスクを表示するか」のIDを取得
     filter_user_id = request.args.get('user_id', type=int)
     filter_user = None
@@ -175,6 +173,7 @@ def index():
 
     return render_template("index.html", 
                            tasks=tasks, 
+                           current_tab=current_tab, 
                            today=today, 
                            edit_task=edit_task,
                            filter_user=filter_user,
